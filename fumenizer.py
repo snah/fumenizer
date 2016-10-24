@@ -17,7 +17,7 @@ except ImportError:
         import ConfigParser as configparser
 
 
-def buildMatrix(imgFilename, threshold, tgm1):
+def build_matrix(imgFilename, threshold, tgm1):
     # image needs to be the exact playfield without the border
     # todo: recognize playfield automagically by looking for squares
     field = cv2.imread(imgFilename)
@@ -99,7 +99,7 @@ def buildMatrix(imgFilename, threshold, tgm1):
     return matrix
 
 
-def exportMatrix(matrix, filename):
+def export_matrix(matrix, filename):
     with open(filename, 'w') as f:
         json.dump(matrix, f)
 
@@ -165,5 +165,5 @@ if __name__ == '__main__':
                            help='TGM1 Compatibility')
     args = argParser.parse_args()
 
-    matrix = buildMatrix(args.imageFile, args.threshold, args.tgm1 or config.getboolean('settings', 'tgm1'))
+    matrix = build_matrix(args.imageFile, args.threshold, args.tgm1 or config.getboolean('settings', 'tgm1'))
     fumenize(matrix, args.preview or config.getboolean('settings', 'preview'))
