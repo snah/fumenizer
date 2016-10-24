@@ -1,8 +1,6 @@
 # author: raincomplex
 import math
 
-import pyperclip
-
 # https://github.com/PetitPrince/TeDiGe-2
 # http://petitprince.github.io/TeDiGe-2/doc/symbols/src/TeDiGe-2_src_tedige-editor.js.html
 
@@ -185,4 +183,9 @@ if __name__ == '__main__':
 
     url = make(frames, 0)
     print(url)
-    pyperclip.copy(url)
+
+    try:
+        import pyperclip
+        pyperclip.copy(url)
+    except ImportError:
+        pass

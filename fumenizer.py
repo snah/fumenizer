@@ -2,7 +2,11 @@
 
 import cv2
 import numpy as np
-import pyperclip
+
+try:
+    import pyperclip
+except ImportError:
+    pass
 
 import fumen
 
@@ -124,7 +128,10 @@ def fumenize(matrix, showPreview):
 
     fumen_url = fumen.make([frame], 0)
     print(fumen_url)
-    pyperclip.copy(fumen_url)
+    try:
+        pyperclip.copy(fumen_url)
+    except NameError:
+        pass
 
     if showPreview:
         # Show result image
