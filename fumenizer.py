@@ -22,18 +22,6 @@ except ImportError:
     import ConfigParser as configparser
 
 
-def get_playfield(image):
-    rectangle_drawer = roiselector.ROISelector(image)
-    region = rectangle_drawer.run()
-    return region.crop(image)
-
-
-def build_matrix_from_file(filename, threshold, tgm1):
-    image = cv2.imread(filename)
-    playfield = get_playfield(image)
-    return build_matrix(playfield, threshold, tgm1)
-
-
 def build_matrix(playfield, threshold, tgm1):
     # image needs to be the exact playfield without the border
     # todo: recognize playfield automagically by looking for squares
@@ -155,7 +143,7 @@ def fumenize(matrix, showPreview):
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
-    # Create default settings file
+    # Create default settings file.
     if not os.path.isfile('fumenizer.ini'):
         f = open("fumenizer.ini", "w")
         f.write("[settings]\n")
@@ -184,5 +172,15 @@ if __name__ == '__main__':
                            help='TGM1 Compatibility')
     args = argParser.parse_args()
 
-    matrix = build_matrix_from_file(args.imageFile, args.threshold, args.tgm1 or config.getboolean('settings', 'tgm1'))
+    # Read image.
+    image = cv2.imread(args.imageFile)
+
+    # Let the user select the playfield.
+    region_selector = roiselector.ROISelector(image)
+    region = region_selector.run()
+
+    # Crop the image to just the playfield.
+    playfield = region.crop(image)
+
+    matrix = build_matrix(playfield, args.threshold, args.tgm1 or config.getboolean('settings', 'tgm1'))
     fumenize(matrix, args.preview or config.getboolean('settings', 'preview'))
