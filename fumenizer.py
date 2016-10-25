@@ -22,85 +22,78 @@ except ImportError:
     import ConfigParser as configparser
 
 
-def build_matrix(playfield, threshold, tgm1):
-    # image needs to be the exact playfield without the border
-    # todo: recognize playfield automagically by looking for squares
-    hsv = cv2.cvtColor(playfield, cv2.COLOR_BGR2HSV)
-    height, width = playfield.shape[:2]
+class PlayfieldConverter:
+    """Converts an image of a playfield into a matrix of blocks."""
+    def __init__(self, region, threshold, debug=False):
+        self.region = region
+        self.threshold = threshold
+        self.debug = debug
 
-    # for i in range(height):
-    #       for j in range(width):
-    #               hue = hsv[i][j][0]
-    #               saturation = hsv[i][j][1]
-    #               value = hsv[i][j][2]
-    #               hsv[i, j] = [hue, saturation, 100]
+    def build_matrix(self, image):
+        """Build a playfield matrix from the given image."""
+        playfield = self.region.crop(image)
 
-    lower = np.array([0, 150, 85])
-    upper = np.array([180, 255, 255])
-    mask = cv2.inRange(hsv, lower, upper)
+        matrix = np.zeros((20, 10))
+        for row, col, part in self._divide_playfield(playfield):
+            matrix[row, col] = self.check_part(part)
 
-    if(tgm1):
-        playfield = cv2.bitwise_and(playfield, playfield, mask=mask)
+        return matrix
 
-    # # uncomment for preview for the tgm1 code
-    # cv2.imshow('f', playfield)
-    # cv2.waitKey()
+    def check_part(self, part):
+        """Check if a part contains a block or not."""
+        grayscale = cv2.cvtColor(part, cv2.COLOR_BGR2GRAY)
+        ret, black_white = cv2.threshold(grayscale, self.threshold, 1, cv2.THRESH_BINARY)
 
-    block_height = height / 20.
-    block_width = width / 10.
+        whites = black_white.sum()
+        blacks = black_white.size - whites
 
-    end = False
-    # matrix is a nested list that represents the playfield
-    # holes are 0's, blocks are 1's
-    # todo: recognize color
-    matrix = []
-    for row in range(20):
-        line = []
-        for col in range(10):
-            y1 = round(height - (row + 1) * block_height)
-            y2 = round(height - row * block_height)
-            x1 = round(col * block_width)
-            x2 = round((col + 1) * block_width)
-            part = playfield[y1:y2, x1:x2]
+        if self.debug:
+            cv2.imshow('b', part)
+            cv2.imshow('c', grayscale)
+            ch = 0xFF & cv2.waitKey()
+            if ch == 27:
+                raise roiselector.CancelException()
 
-            thresh = cv2.cvtColor(part, cv2.COLOR_BGR2GRAY)
-            ret, thresh = cv2.threshold(thresh, threshold, 255, cv2.THRESH_BINARY)
-            # Sometimes a little tinkering with the 2nd parameter (aka the threshold value)
-            # of threshold is required (e.g. going higher than 20)
-            temp_height, temp_width = thresh.shape[:2]
-            # Blocks will now be predominantly white squares, so we're counting
-            # black and white pixels
-            black = 0
-            white = 0
-            for i in range(temp_height):
-                for j in range(temp_width):
-                    if thresh[i, j] == 0:
-                        black += 1
-                    else:
-                        white += 1
-            # TGM1 mode is still kind of hacky and needs improvement
-            if tgm1:
-                if white > 60:
-                    line.append(1)
-                else:
-                    line.append(0)
-            else:
-                if white > black:
-                    line.append(1)
-                else:
-                    line.append(0)
+        return self._threshold_function(whites, blacks)
 
-            # Uncomment this part to go through the coordinates one by one
-            # cv2.imshow('b', part)
-            # cv2.imshow('c', thresh)
-            # ch = 0xFF & cv2.waitKey()
-            # if ch == 27:
-            #    end = True
-            #    break
-        matrix.append(line)
-        if end:
-                break
-    return matrix
+    def _threshold_function(self, whites, blacks):
+        return whites > blacks
+
+    def _divide_playfield(self, playfield):
+        height, width = playfield.shape[:2]
+
+        block_height = height / 20.
+        block_width = width / 10.
+
+        for row in range(20):
+            for col in range(10):
+                y1 = round(height - (row + 1) * block_height)
+                y2 = round(height - row * block_height)
+                x1 = round(col * block_width)
+                x2 = round((col + 1) * block_width)
+                part = playfield[y1:y2, x1:x2]
+                yield row, col, part
+
+
+class TGM1PlayfieldConverter(PlayfieldConverter):
+    """Playfiled converter with TGM correction."""
+    def build_matrix(self, image):
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        lower = np.array([0, 150, 85])
+        upper = np.array([180, 255, 255])
+        mask = cv2.inRange(hsv, lower, upper)
+
+        image = cv2.bitwise_and(image, image, mask=mask)
+
+        # Uncomment for preview of the tgm1 corrected image.
+        cv2.imshow('f', region.crop(image))
+        cv2.waitKey()
+
+        return super().build_matrix(image)
+
+    def _threshold_function(self, whites, blacks):
+        return whites > 60
 
 
 def export_matrix(matrix, filename):
@@ -182,5 +175,9 @@ if __name__ == '__main__':
     # Crop the image to just the playfield.
     playfield = region.crop(image)
 
-    matrix = build_matrix(playfield, args.threshold, args.tgm1 or config.getboolean('settings', 'tgm1'))
+    if args.tgm1 or config.getboolean('settings', 'tgm1'):
+        playfield_converter = TGM1PlayfieldConverter(region, args.threshold)
+    else:
+        playfield_converter = PlayfieldConverter(region, args.threshold)
+    matrix = playfield_converter.build_matrix(image)
     fumenize(matrix, args.preview or config.getboolean('settings', 'preview'))
