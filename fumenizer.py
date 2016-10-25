@@ -9,6 +9,7 @@ except ImportError:
     pass
 
 import fumen
+import roiselector
 
 import json
 
@@ -16,17 +17,28 @@ import sys
 import os
 import argparse
 try:
-        import configparser
+    import configparser
 except ImportError:
-        import ConfigParser as configparser
+    import ConfigParser as configparser
 
 
-def build_matrix(imgFilename, threshold, tgm1):
+def get_playfield(image):
+    rectangle_drawer = roiselector.ROISelector(image)
+    region = rectangle_drawer.run()
+    return region.crop(image)
+
+
+def build_matrix_from_file(filename, threshold, tgm1):
+    image = cv2.imread(filename)
+    playfield = get_playfield(image)
+    return build_matrix(playfield, threshold, tgm1)
+
+
+def build_matrix(playfield, threshold, tgm1):
     # image needs to be the exact playfield without the border
     # todo: recognize playfield automagically by looking for squares
-    field = cv2.imread(imgFilename)
-    hsv = cv2.cvtColor(field, cv2.COLOR_BGR2HSV)
-    height, width = field.shape[:2]
+    hsv = cv2.cvtColor(playfield, cv2.COLOR_BGR2HSV)
+    height, width = playfield.shape[:2]
 
     # for i in range(height):
     #       for j in range(width):
@@ -40,10 +52,10 @@ def build_matrix(imgFilename, threshold, tgm1):
     mask = cv2.inRange(hsv, lower, upper)
 
     if(tgm1):
-        field = cv2.bitwise_and(field, field, mask=mask)
+        playfield = cv2.bitwise_and(playfield, playfield, mask=mask)
 
     # # uncomment for preview for the tgm1 code
-    # cv2.imshow('f', field)
+    # cv2.imshow('f', playfield)
     # cv2.waitKey()
 
     block_height = height / 20.
@@ -61,7 +73,7 @@ def build_matrix(imgFilename, threshold, tgm1):
             y2 = round(height - row * block_height)
             x1 = round(col * block_width)
             x2 = round((col + 1) * block_width)
-            part = field[y1:y2, x1:x2]
+            part = playfield[y1:y2, x1:x2]
 
             thresh = cv2.cvtColor(part, cv2.COLOR_BGR2GRAY)
             ret, thresh = cv2.threshold(thresh, threshold, 255, cv2.THRESH_BINARY)
@@ -172,5 +184,5 @@ if __name__ == '__main__':
                            help='TGM1 Compatibility')
     args = argParser.parse_args()
 
-    matrix = build_matrix(args.imageFile, args.threshold, args.tgm1 or config.getboolean('settings', 'tgm1'))
+    matrix = build_matrix_from_file(args.imageFile, args.threshold, args.tgm1 or config.getboolean('settings', 'tgm1'))
     fumenize(matrix, args.preview or config.getboolean('settings', 'preview'))

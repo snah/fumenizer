@@ -10,7 +10,7 @@ import fumenizer
 
 class TestBuildMatrix(unittest.TestCase):
         def compare_image_to_file(self, image_file, data_file):
-                matrix = fumenizer.build_matrix(image_file, 20, 0)
+                matrix = fumenizer.build_matrix_from_file(image_file, 20, 0)
                 with open(data_file, 'r') as f:
                         expected_matrix = json.load(f)
 
